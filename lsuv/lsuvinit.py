@@ -38,22 +38,16 @@ def store_activations(self, input, output):
     return
 
 
-def is_relevant_layer(m, ignore_layers_regexp_list=None):
+def is_relevant_layer(m):
     relevant_layers = [nn.Conv2d, nn.Linear, nn.Conv1d, nn.Conv3d, nn.ConvTranspose1d, nn.ConvTranspose2d, nn.ConvTranspose3d]
     valid =  any([isinstance(m, l) for l in relevant_layers])
-    if valid and (ignore_layers_regexp_list is not None):
-        for r in ignore_layers_regexp_list:
-            match = re.search(r, str(m)) 
-            if match:
-                valid = False
-                break
     return valid
 
 
 def add_current_hook(m):
     if gg['hook'] is not None:
         return
-    if is_relevant_layer(m, gg['ignore_layers_regexp']):
+    if is_relevant_layer(m):
         if gg['hook_position'] > gg['done_counter']:
             gg['hook'] = m.register_forward_hook(store_activations)
             print (' hooking layer = ', gg['hook_position'], m)
@@ -63,7 +57,7 @@ def add_current_hook(m):
     return
 
 def count_conv_fc_layers(m):
-    if is_relevant_layer(m, gg['ignore_layers_regexp']):
+    if is_relevant_layer(m):
         gg['total_fc_conv_layers'] +=1
     return
 
@@ -73,7 +67,7 @@ def remove_hooks(hooks):
     return
 
 def orthogonal_weights_init(m):
-    if is_relevant_layer(m, gg['ignore_layers_regexp']):
+    if is_relevant_layer(m):
         if hasattr(m, 'weight'):
             torch.nn.init.orthogonal_(m.weight)
         if hasattr(m, 'bias'):
@@ -86,7 +80,7 @@ def apply_weights_correction(m):
         return
     if not gg['correction_needed']:
         return
-    if is_relevant_layer(m, gg['ignore_layers_regexp']):
+    if is_relevant_layer(m):
         if gg['counter_to_apply_correction'] < gg['hook_position']:
             gg['counter_to_apply_correction'] += 1
         else:
@@ -103,7 +97,6 @@ def LSUVinit(model,
              std_tol:float  = 0.1,
              max_attempts: int = 10,
              do_orthonorm: bool = True,
-             ignore_layers_regexp_list: Optional[List[str]] = None,
              verbose: bool = True,
              device=torch.device('cpu')):
     '''Perform Layer-sequential unit-variance (LSUV) initialization using single batch.
@@ -114,7 +107,6 @@ def LSUVinit(model,
         std_tol: tolerance for std, default 0.1
         max_attempts: maximum number of attempts to adjust weights, default 1.0
         do_orthonorm: if True, perform orthonormal initialization
-        ignore_layers_regexp_list: list of regexp patterns to ignore
         verbose: if True, print debugging information
         device: torch.device
     Returns:
@@ -125,7 +117,6 @@ def LSUVinit(model,
     gg['done_counter']= 0
     gg['hook_position'] = 0
     gg['hook']  = None
-    gg['ignore_layers_regexp'] = ignore_layers_regexp_list
     model.eval()
     data_dev = move_to(data, device)
     model = model.to(device)
