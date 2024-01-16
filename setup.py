@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(name='lsuv',
-      version='0.2',
+      version='0.2.1',
       description='LSUV initialization for PyTorch',
       url='http://github.com/ducha-aiki/lsuv',
       author='Dmytro Mishkin',

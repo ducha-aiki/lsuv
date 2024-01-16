@@ -2,6 +2,8 @@ from __future__ import print_function
 import torch
 import torch.nn.init
 import torch.nn as nn
+import re
+from typing import List, Optional
 
 gg = {}
 gg['hook_position'] = 0
@@ -11,7 +13,7 @@ gg['hook'] = None
 gg['act_dict'] = {}
 gg['counter_to_apply_correction'] = 0
 gg['correction_needed'] = False
-gg['current_coef'] = 1.0
+gg['scale_to_apply'] = 1.0
 
 
 def move_to(obj, device):
@@ -37,18 +39,18 @@ def store_activations(self, input, output):
 
 
 def is_relevant_layer(m):
-    relevant_layers = [nn.Conv2d, nn.Linear, nn.Conv1d, nn.Conv1d, nn.Conv3d, nn.ConvTranspose1d, nn.ConvTranspose2d, nn.ConvTranspose3d]
-    return any([isinstance(m, l) for l in relevant_layers])
+    relevant_layers = [nn.Conv2d, nn.Linear, nn.Conv1d, nn.Conv3d, nn.ConvTranspose1d, nn.ConvTranspose2d, nn.ConvTranspose3d]
+    valid =  any([isinstance(m, l) for l in relevant_layers])
+    return valid
 
 
 def add_current_hook(m):
     if gg['hook'] is not None:
         return
     if is_relevant_layer(m):
-        #print 'trying to hook to', m, gg['hook_position'], gg['done_counter']
         if gg['hook_position'] > gg['done_counter']:
             gg['hook'] = m.register_forward_hook(store_activations)
-            #print ' hooking layer = ', gg['hook_position'], m
+            print (' hooking layer = ', gg['hook_position'], m)
         else:
             #print m, 'already done, skipping'
             gg['hook_position'] += 1
@@ -83,11 +85,9 @@ def apply_weights_correction(m):
             gg['counter_to_apply_correction'] += 1
         else:
             if hasattr(m, 'weight'):
-                m.weight.data *= float(gg['current_coef'])
-                gg['correction_needed'] = False
-            if hasattr(m, 'bias'):
-                if m.bias is not None:
-                    m.bias.data += float(gg['current_bias'])
+                print (f"Applying correction coefficient: {gg['scale_to_apply']}")
+                m.weight.data[:] *= float(gg['scale_to_apply'])
+                gg['correction_needed'] = False  
             return
     return
 
@@ -97,7 +97,6 @@ def LSUVinit(model,
              std_tol:float  = 0.1,
              max_attempts: int = 10,
              do_orthonorm: bool = True,
-             needed_mean: float = 0.,
              verbose: bool = True,
              device=torch.device('cpu')):
     '''Perform Layer-sequential unit-variance (LSUV) initialization using single batch.
@@ -108,7 +107,6 @@ def LSUVinit(model,
         std_tol: tolerance for std, default 0.1
         max_attempts: maximum number of attempts to adjust weights, default 1.0
         do_orthonorm: if True, perform orthonormal initialization
-        needed_mean: target mean of activation, default 0.0
         verbose: if True, print debugging information
         device: torch.device
     Returns:
@@ -138,15 +136,15 @@ def LSUVinit(model,
             if verbose: print ('std at layer ',layer_idx, ' = ', current_std)
             attempts = 0
             while (abs(current_std - needed_std) > std_tol):
-                gg['current_coef'] =  needed_std / (current_std  + 1e-8);
-                gg['current_bias'] =  needed_mean - current_mean * gg['current_coef'];
+                gg['scale_to_apply'] = needed_std / (current_std  + 1e-8)
                 gg['correction_needed'] = True
                 model.apply(apply_weights_correction)
                 model = model.to(device)
+                if verbose: print ('Before the correction, std at layer ',layer_idx, ' = ', current_std, 'mean = ', current_mean)
                 _ = model(data_dev)
                 current_std = gg['act_dict'].std()
                 current_mean = gg['act_dict'].mean()
-                if verbose: print ('std at layer ',layer_idx, ' = ', current_std, 'mean = ', current_mean)
+                if verbose: print ('After the correction, std at layer ',layer_idx, ' = ', current_std, 'mean = ', current_mean)
                 attempts+=1
                 if attempts > max_attempts:
                     if verbose: print ('Cannot converge in ', max_attempts, 'iterations')
