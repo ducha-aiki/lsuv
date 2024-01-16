@@ -173,6 +173,7 @@ def lsuv_with_dataloader(model, dataloader, **kwargs):
         model with adjusted weights'''
     for batch in dataloader:
         break
+    batch = batch[0]
     return LSUVinit(model, batch, **kwargs)
 
 
