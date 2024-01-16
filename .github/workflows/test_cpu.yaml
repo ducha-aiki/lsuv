@@ -1,0 +1,29 @@
+name: tests
+on:
+  push:
+    branches:
+    - main
+    paths-ignore:
+      - README.md
+  pull_request:
+    paths-ignore:
+      - README.md
+  workflow_dispatch:
+jobs:
+  cpu:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout github repo (+ download lfs dependencies)
+        uses: actions/checkout@v2
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.9' 
+      - name: Install package dependencies
+        run: |
+          pip install -r requirements.txt
+      - name: Install test dependencies
+        run: |
+          pip install . && pip install pytest torchvision
+      - name: Test
+        run: |
+          pytest test/
