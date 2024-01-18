@@ -10,7 +10,9 @@ class TestLSUV:
         inp = torch.rand(8, 3, 128, 128)
         inp = inp / inp.std()
         model = tv.models.vgg11(pretrained=False)
-        new_model = lsuv_with_singlebatch(model, inp, device=device)
+        verbose = False
+        print (f"Testing with verbose = {verbose}")
+        new_model = lsuv_with_singlebatch(model, inp, device=device, verbose = verbose)
     
     def test_vit(self):
         device = torch.device('cpu')
