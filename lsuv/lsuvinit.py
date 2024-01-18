@@ -14,6 +14,8 @@ gg['act_dict'] = {}
 gg['counter_to_apply_correction'] = 0
 gg['correction_needed'] = False
 gg['scale_to_apply'] = 1.0
+gg['verbose'] = True
+
 
 
 def move_to(obj, device):
@@ -50,7 +52,7 @@ def add_current_hook(m):
     if is_relevant_layer(m):
         if gg['hook_position'] > gg['done_counter']:
             gg['hook'] = m.register_forward_hook(store_activations)
-            print (' hooking layer = ', gg['hook_position'], m)
+            if gg['verbose']: print (' hooking layer = ', gg['hook_position'], m)
         else:
             #print m, 'already done, skipping'
             gg['hook_position'] += 1
@@ -85,7 +87,7 @@ def apply_weights_correction(m):
             gg['counter_to_apply_correction'] += 1
         else:
             if hasattr(m, 'weight'):
-                print (f"Applying correction coefficient: {gg['scale_to_apply']}")
+                if gg['verbose']: print (f"Applying correction coefficient: {gg['scale_to_apply']}")
                 m.weight.data[:] *= float(gg['scale_to_apply'])
                 gg['correction_needed'] = False  
             return
@@ -116,7 +118,8 @@ def LSUVinit(model,
     gg['total_fc_conv_layers']=0
     gg['done_counter']= 0
     gg['hook_position'] = 0
-    gg['hook']  = None
+    gg['hook'] = None
+    gg['verbose'] = verbose
     model.eval()
     data_dev = move_to(data, device)
     model = model.to(device)

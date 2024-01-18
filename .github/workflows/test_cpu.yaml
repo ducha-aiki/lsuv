@@ -26,4 +26,4 @@ jobs:
           pip install . && pip install pytest torchvision
       - name: Test
         run: |
-          pytest test/
+          pytest -s test/
